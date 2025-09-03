@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RemoteMic 需要访问麦克风以采集音频并在局域网内传输。</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RemoteMic 需要访问局域网以发现并连接其他设备传输音频。</string>
+</dict>
+</plist>

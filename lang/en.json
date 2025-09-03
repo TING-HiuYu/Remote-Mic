@@ -1,0 +1,52 @@
+{
+  "app.title": "Remote Microphone",
+  "group.setting": "Settings",
+  "group.server": "Server",
+  "group.client": "Client",
+  "setting.mic": "Microphone",
+  "setting.lan": "LAN",
+  "audio.input_device": "Input Device",
+  "audio.output_device": "Output Device",
+  "audio.install_virtual_mic": "Virtual Microphone Installation Guide",
+  "server.ip": "Bind IP",
+  "server.port": "Port",
+  "server.start": "Start Server",
+  "server.stop": "Stop Server",
+  "server.status.running": "Running",
+  "server.status.stopped": "Stopped",
+  "server.status.listening": "Listening",
+  "server.status.audio_ready": "Audio Ready",
+  "server.connected_clients": "Connected Clients",
+  "server.no_clients": "No clients connected",
+  "server.client.udp": "UDP",
+  "client.disconnected.prefix": "Client disconnected: ",
+  "error.client.missing_fields": "Missing server info: IP or Port is empty",
+  "error.client.invalid_ip": "Invalid server IP",
+  "error.client.invalid_port": "Invalid server port",
+  "dialog.error.title": "Error",
+  "client.server_ip": "Server IP",
+  "client.server_port": "Server Port",
+  "client.connect": "Connect",
+  "client.disconnect": "Disconnect",
+  "client.status.connected": "Connected",
+  "client.status.disconnected": "Disconnected",
+  "client.config.sample_rate": "Sample Rate",
+  "client.config.channels": "Channels",
+  "client.config.sample_format": "Sample Format",
+  "dialog.virtual_mic": "Copy https://vb-audio.com/Cable/ and paste it into your browser, download VB-Cable app corresponding to your operating system, and follow the page instructions to install",
+  "lang.current": "Language"
+  ,"server.metrics.title": "Server Status"
+  ,"server.metrics.volume": "Input Volume"
+  ,"client.metrics.volume": "Volume"
+  ,"client.metrics.title": "Client Status"
+  ,"client.metrics.latency": "Avg Latency(ms)"
+  ,"client.metrics.jitter": "Jitter(ms)"
+  ,"client.metrics.loss": "Loss"
+  ,"client.metrics.late": "Late Drops",
+  "server.psk": "PSK",
+  "client.psk": "PSK",
+  "enc.enabled": "Encrypted",
+  "enc.disabled": "Plain",
+  "enc.auth_failed": "Key Error",
+  "this.lang": "English"
+}

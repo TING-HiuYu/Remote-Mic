@@ -1,0 +1,43 @@
+# =============================
+# RemoteMic / Rust / Dioxus
+# =============================
+# 编译产物
+/target/
+**/*.dSYM/
+
+# 依赖/构建缓存（如有）
+/.cargo/
+/.rustup/
+
+# 临时与日志
+*.log
+log/
+logs/
+*.tmp
+*.swp
+*.swo
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# 打包/发布临时
+/dist/
+/release/
+*.tar
+*.tar.*
+*.zip
+
+# 运行时生成
+*.pid
+
+# 覆盖率/测试
+coverage/
+*.profraw
+
+# 其它
+*.old
+*.bak

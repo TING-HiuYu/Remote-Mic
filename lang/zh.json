@@ -1,0 +1,52 @@
+{
+  "app.title": "远程麦克风",
+  "group.setting": "设置",
+  "group.server": "服务端",
+  "setting.mic": "麦克风",
+  "setting.lan": "局域网",
+  "group.client": "客户端",
+  "audio.input_device": "输入设备",
+  "audio.output_device": "输出设备",
+  "audio.install_virtual_mic": "虚拟麦克风安装指南",
+  "server.ip": "绑定IP",
+  "server.port": "绑定端口",
+  "server.start": "开启服务",
+  "server.stop": "停止服务",
+  "server.status.running": "运行中",
+  "server.status.stopped": "未启动",
+  "server.connected_clients": "已连接客户端",
+  "server.no_clients": "无客户端连接",
+  "server.client.udp": "UDP端口",
+  "client.disconnected.prefix": "客户端断开: ",
+  "error.client.missing_fields": "未输入服务端信息: IP或端口为空",
+  "error.client.invalid_ip": "未输入服务端信息: 无效的IP地址",
+  "error.client.invalid_port": "未输入服务端信息: 无效的端口",
+  "dialog.error.title": "错误",
+  "client.server_ip": "服务器IP",
+  "client.server_port": "服务器端口",
+  "client.connect": "连接",
+  "client.disconnect": "断开",
+  "client.status.connected": "已连接",
+  "client.status.disconnected": "未连接",
+  "client.config.sample_rate": "采样率",
+  "client.config.channels": "声道数",
+  "client.config.sample_format": "采样深度",
+  "dialog.virtual_mic": "复制https://vb-audio.com/Cable/并粘贴到浏览器，下载对应自己操作系统的VB-Cable软件，并按照页面指示安装",
+  "lang.current": "语言",
+  "server.status.listening": "监听中",
+  "server.status.audio_ready": "服务器就绪"
+  ,"client.metrics.title": "客户端状态"
+  ,"client.metrics.latency": "平均延迟(ms)"
+  ,"client.metrics.jitter": "抖动(ms)"
+  ,"client.metrics.loss": "丢包率"
+  ,"client.metrics.late": "过延迟丢弃帧"
+  ,"client.metrics.volume": "当前音量"
+  ,"server.metrics.title": "服务端状态"
+  ,"server.metrics.volume": "输入音量",
+  "server.psk": "预共享密钥",
+  "client.psk": "预共享密钥",
+  "enc.enabled": "已加密",
+  "enc.disabled": "未加密",
+  "enc.auth_failed": "密钥错误",
+  "this.lang": "简体中文"
+}

@@ -1,0 +1,151 @@
+name: Build Multi-Platform Bundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional version tag (e.g. v0.1.0). If set, a release draft will be created."
+        required: false
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+  PROJECT_NAME: remote-mic
+
+jobs:
+  matrix-prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          echo 'matrix={"include":[
+            {"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl","arch":"amd64","platform":"linux/amd64"},
+            {"os":"ubuntu-latest","target":"aarch64-unknown-linux-musl","arch":"arm64","platform":"linux/arm64"},
+            {"os":"windows-latest","target":"x86_64-pc-windows-msvc","arch":"amd64","platform":"windows/amd64"},
+            {"os":"windows-latest","target":"aarch64-pc-windows-msvc","arch":"arm64","platform":"windows/arm64"},
+            {"os":"macos-latest","target":"x86_64-apple-darwin","arch":"amd64","platform":"darwin/amd64"},
+            {"os":"macos-latest","target":"aarch64-apple-darwin","arch":"arm64","platform":"darwin/arm64"}
+          ]}' >> $GITHUB_OUTPUT
+  
+  build:
+  name: Bundle ${{ matrix.target }}
+    needs: matrix-prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix-prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+
+      - name: Install dioxus-cli
+        run: cargo install dioxus-cli --locked
+
+      - name: Bundle (native / dx)
+        if: startsWith(matrix.target, 'x86_64-') || startsWith(matrix.target, 'aarch64-apple') || matrix.target == 'x86_64-pc-windows-msvc'
+        run: |
+          echo "Bundling target ${{ matrix.target }} via dx bundle"
+          dx bundle --platform desktop --release --targets ${{ matrix.target }}
+
+      - name: Bundle linux aarch64 via docker (dx inside cross image)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ghcr.io/cross-rs/aarch64-unknown-linux-musl:latest
+          options: -v ${{ github.workspace }}:/project -w /project
+          run: |
+            cargo install dioxus-cli --locked || true
+            dx bundle --platform desktop --release --targets aarch64-unknown-linux-musl || echo "(dx bundle may not fully support musl in container)"
+
+      - name: Windows ARM64 placeholder
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        run: echo "Windows ARM64 dx bundle not yet supported on hosted runner" > BUILD_NOTES.txt
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -e
+          OUT=dist
+          mkdir -p "$OUT"
+          # Try to locate produced binary/bundle
+          echo "Listing target tree for debug:"; find target -maxdepth 4 -type f -name "${PROJECT_NAME}*" | head -n 50 || true
+          BIN_PATTERN="target/${{ matrix.target }}/release/${PROJECT_NAME}*"
+          for f in $BIN_PATTERN; do
+            if [ -f "$f" ]; then cp "$f" "$OUT/"; fi
+          done
+          # Also capture dx bundle outputs (macOS .app, Windows .exe, Linux binary)
+          if [ -d "target/release/bundle" ]; then tar czf "$OUT/${PROJECT_NAME}-${{ matrix.target }}-bundle.tar.gz" -C target/release bundle || true; fi
+          if ls $OUT | grep -q "${PROJECT_NAME}"; then echo "Artifacts collected:"; ls -l $OUT; else echo "No artifacts found (possibly unsupported target)"; fi
+          pushd $OUT >/dev/null || exit 0
+          for a in *; do if [ -f "$a" ]; then shasum -a 256 "$a" > "$a.sha256" || true; fi; done
+          popd >/dev/null || true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  release:
+  name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+            path: _artifacts
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find _artifacts -type f -maxdepth 2 -exec cp {} release/ \; || true
+          ls -l release
+      - name: Compute checksums file
+        run: |
+          cd release
+          shasum -a 256 * > SHA256SUMS.txt || true
+          cd ..
+      - name: Set version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF#refs/tags/}"
+          elif [[ "${{ inputs.version }}" != "" ]]; then
+            VER="${{ inputs.version }}"
+          else
+            VER="manual-${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$VER" >> $GITHUB_OUTPUT
+      - name: Create (or update) release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          draft: false
+          prerelease: false
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

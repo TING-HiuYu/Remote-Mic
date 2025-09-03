@@ -1,0 +1,36 @@
+app = "remote-mic"
+out_dir = "dist"
+default_platform = "desktop"
+
+[application]
+name = "RemoteMic"
+identifier = "com.example.remotemic"
+version = "0.1.0"
+description = "Local network remote microphone prototype"
+license = "UNLICENSED"
+
+[desktop]
+# Window hints (optional tweaks)
+width = 900
+height = 650
+resizable = true
+transparent = false
+decorations = true
+
+[bundle]
+identifier = "com.example.remotemic"
+files = {}
+icon = ["assets/icon/icon.icns", "assets/icon/icon.ico"]
+publisher = "Example"
+copyright = "(c) 2025"
+category = "public.app-category.utilities"
+
+hardened_runtime = false # macOS 签名/公证前可保持 false
+
+[bundle.macos]
+files = {}
+frameworks = []
+minimum_system_version = "11.0"
+hardened_runtime = false
+info_plist_path = "Info.plist"
+
