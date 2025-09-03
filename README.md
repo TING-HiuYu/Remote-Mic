@@ -80,7 +80,7 @@ dx bundle --platform desktop --release
 - `docs/security.md` 加密与威胁模型
 
 ## 许可证
-当前为私有原型 (未选择开源许可证)。若公开建议 MIT / Apache-2.0。
+MIT License
 
 ## 致谢
 图标与第三方素材：见 `ATTRIBUTIONS.md`。
