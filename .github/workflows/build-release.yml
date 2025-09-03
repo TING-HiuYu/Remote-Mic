@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Optional version tag (e.g. v0.1.0). If set, a release draft will be created."
+        description: "Optional version (e.g. v0.1.0). If provided (and no tag), a release will use it."
         required: false
         type: string
   push:
@@ -25,17 +25,16 @@ jobs:
       - id: set-matrix
         run: |
           echo 'matrix={"include":[
-            {"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl","arch":"amd64","platform":"linux/amd64"},
-            {"os":"ubuntu-latest","target":"aarch64-unknown-linux-musl","arch":"arm64","platform":"linux/arm64"},
-            {"os":"windows-latest","target":"x86_64-pc-windows-msvc","arch":"amd64","platform":"windows/amd64"},
-            {"os":"windows-latest","target":"aarch64-pc-windows-msvc","arch":"arm64","platform":"windows/arm64"},
-            {"os":"macos-latest","target":"x86_64-apple-darwin","arch":"amd64","platform":"darwin/amd64"},
-            {"os":"macos-latest","target":"aarch64-apple-darwin","arch":"arm64","platform":"darwin/arm64"}
+            {"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl"},
+            {"os":"ubuntu-latest","target":"aarch64-unknown-linux-musl"},
+            {"os":"windows-latest","target":"x86_64-pc-windows-msvc"},
+            {"os":"windows-latest","target":"aarch64-pc-windows-msvc"},
+            {"os":"macos-latest","target":"x86_64-apple-darwin"},
+            {"os":"macos-latest","target":"aarch64-apple-darwin"}
           ]}' >> $GITHUB_OUTPUT
       - id: set-version
         shell: bash
         run: |
-          # Determine version: tag > workflow input > manual build number
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             VER="${GITHUB_REF#refs/tags/}"
           elif [[ "${{ inputs.version }}" != "" ]]; then
@@ -43,9 +42,8 @@ jobs:
           else
             VER="manual-${GITHUB_RUN_NUMBER}"
           fi
-          echo "Resolved version: $VER"
           echo "version=$VER" >> $GITHUB_OUTPUT
-  
+
   build:
     name: Bundle ${{ matrix.target }}
     needs: matrix-prepare
@@ -82,7 +80,7 @@ jobs:
       - name: Bundle (native / dx)
         if: startsWith(matrix.target, 'x86_64-') || startsWith(matrix.target, 'aarch64-apple') || matrix.target == 'x86_64-pc-windows-msvc'
         run: |
-          echo "Bundling target ${{ matrix.target }} via dx bundle"
+          echo "dx bundle for ${{ matrix.target }}"
           dx bundle --platform desktop --release --targets ${{ matrix.target }}
 
       - name: Bundle linux aarch64 via docker (dx inside cross image)
@@ -99,106 +97,103 @@ jobs:
         if: matrix.target == 'aarch64-pc-windows-msvc'
         run: echo "Windows ARM64 dx bundle not yet supported on hosted runner" > BUILD_NOTES.txt
 
-      - name: Collect artifacts
+      - name: Collect & archive artifacts
         shell: bash
         run: |
           set -e
+          VERSION_SAFE="$VERSION"
           OUT=dist
           mkdir -p "$OUT"
-          # Try to locate produced binary/bundle
-            # Create unified archive: remote-mic-${version}-${target}.{tar.gz|zip}
-            ARCHIVE_DIR="pack"
-            mkdir -p "$ARCHIVE_DIR"
-            if [[ "${{ matrix.target }}" == *windows* ]] || [[ "${{ matrix.target }}" == *apple-darwin* ]]; then
-              ARCHIVE="remote-mic-${VERSION}-${{ matrix.target }}.zip"
-              (cd "$OUT" && zip -r "../$ARCHIVE" .) || echo "Zip creation failed"
-              mv "$ARCHIVE" "$ARCHIVE_DIR/" || true
-            else
-              ARCHIVE="remote-mic-${VERSION}-${{ matrix.target }}.tar.gz"
-              tar czf "$ARCHIVE" -C "$OUT" . || echo "Tar creation failed"
-              mv "$ARCHIVE" "$ARCHIVE_DIR/" || true
-            fi
-            # Generate checksum for archive only
-            pushd "$ARCHIVE_DIR" >/dev/null || exit 0
-            FILE=$(ls -1 remote-mic-${VERSION}-${{ matrix.target }}.* | head -n1 || true)
-            if [ -f "$FILE" ]; then
-              if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$FILE" > "$FILE.sha256";
-              elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$FILE" | awk '{print $1"  "f}' f="$FILE" > "$FILE.sha256";
-              elif command -v certutil >/dev/null 2>&1; then certutil -hashfile "$FILE" SHA256 | sed -n '2p' | tr -d '\r' | awk '{print $1"  "f}' f="$FILE" > "$FILE.sha256"; fi
-            else
-              echo "No archive produced" > NO_ARCHIVE.txt
-            fi
-            popd >/dev/null || true
-          pushd $OUT >/dev/null || exit 0
-          for a in *; do
-            [ -f "$a" ] || continue
-            name: ${{ matrix.target }}
-            path: pack/*
-            elif command -v sha256sum >/dev/null 2>&1; then
-              sha256sum "$a" | awk '{print $1"  "f}' f="$a" > "$a.sha256" || true
-            elif command -v certutil >/dev/null 2>&1; then
-      needs: [matrix-prepare, build]
-            fi
-          done
+          echo "Listing build target tree (partial):"
+          find target -maxdepth 4 -type f -name "${PROJECT_NAME}*" | head -n 40 || true
+          BIN_PATTERN="target/${{ matrix.target }}/release/${PROJECT_NAME}*"
+          for f in $BIN_PATTERN; do [ -f "$f" ] && cp "$f" "$OUT/" || true; done
+          # dx bundle output (bundle folder) if exists
+          if [ -d "target/release/bundle" ]; then
+            cp -R target/release/bundle "$OUT/" 2>/dev/null || true
+          fi
+          ls -l "$OUT" || true
+          ARCHIVE_DIR=pack
+          mkdir -p "$ARCHIVE_DIR"
+          if [[ "${{ matrix.target }}" == *windows* || "${{ matrix.target }}" == *apple-darwin* ]]; then
+            ARCHIVE="remote-mic-${VERSION_SAFE}-${{ matrix.target }}.zip"
+            (cd "$OUT" && zip -r "../$ARCHIVE" .) || echo "Zip creation failed"
+          else
+            ARCHIVE="remote-mic-${VERSION_SAFE}-${{ matrix.target }}.tar.gz"
+            tar czf "$ARCHIVE" -C "$OUT" . || echo "Tar creation failed"
+          fi
+          mv "$ARCHIVE" "$ARCHIVE_DIR/" 2>/dev/null || true
+          pushd "$ARCHIVE_DIR" >/dev/null || exit 0
+          FILE=$(ls -1 remote-mic-${VERSION_SAFE}-${{ matrix.target }}.* 2>/dev/null | head -n1 || true)
+          if [ -f "$FILE" ]; then
+            if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$FILE" > "$FILE.sha256";
+            elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$FILE" | awk '{print $1"  "f}' f="$FILE" > "$FILE.sha256";
+            elif command -v certutil >/dev/null 2>&1; then certutil -hashfile "$FILE" SHA256 | sed -n '2p' | tr -d '\r' | awk '{print $1"  "f}' f="$FILE" > "$FILE.sha256"; fi
+          else
+            echo "No archive produced" > NO_ARCHIVE.txt
+          fi
           popd >/dev/null || true
+          echo "Archive contents:"; ls -l "$ARCHIVE_DIR" || true
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: dist/*
+          path: pack/*
 
   release:
     name: Create Release
-    needs: build
+    needs: [matrix-prepare, build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
+    env:
+      VERSION: ${{ needs.matrix-prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: _artifacts
-        - name: Generate release notes
-          id: notes
-          shell: bash
-          env:
-            VERSION: ${{ needs.matrix-prepare.outputs.version }}
-          run: |
-            {
-              echo "# Remote Mic $VERSION";
-              echo;
-              echo "Automated build for version $VERSION.";
-              echo;
-              echo "## Artifacts";
-              ls -1 release/remote-mic-* 2>/dev/null | sed 's|release/|- |';
-              echo;
-              echo "## Notes";
-              if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-                echo "Triggered by tag $GITHUB_REF.";
-              else
-                echo "Manual workflow_dispatch trigger.";
-              fi
-              echo "Generated at $(date -u '+%Y-%m-%dT%H:%M:%SZ').";
-            } > release_body.md
-            echo "body_path=release_body.md" >> $GITHUB_OUTPUT
-        id: ver
+      - name: Gather release assets
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            tag_name: ${{ needs.matrix-prepare.outputs.version }}
-            name: ${{ needs.matrix-prepare.outputs.version }}
-            VER="${{ inputs.version }}"
-          else
-            VER="manual-${GITHUB_RUN_NUMBER}"
-            body_path: release_body.md
-          fi
-          echo "version=$VER" >> $GITHUB_OUTPUT
+          mkdir -p release
+          find _artifacts -maxdepth 2 -type f -exec cp {} release/ \; || true
+          ls -l release || true
+      - name: Consolidate checksums
+        run: |
+          cd release
+          # consolidate any per-file .sha256 into one list
+            grep -h "remote-mic-" *.sha256 2>/dev/null | sort -k2 -u > SHA256SUMS.txt || true
+          cd ..
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo "# Remote Mic $VERSION";
+            echo;
+            echo "Automated build for $VERSION";
+            echo;
+            echo "## Artifacts";
+            ls -1 release/remote-mic-* 2>/dev/null | sed 's|release/|- |';
+            echo;
+            echo "## Trigger";
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "Triggered by tag $GITHUB_REF";
+            else
+              echo "Manual workflow_dispatch";
+            fi
+            echo;
+            echo "Generated at $(date -u '+%Y-%m-%dT%H:%M:%SZ')";
+          } > release_body.md
+          echo "body_path=release_body.md" >> $GITHUB_OUTPUT
       - name: Create (or update) release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.version }}
-          name: ${{ steps.ver.outputs.version }}
+          tag_name: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
           draft: false
           prerelease: false
           files: release/*
+          body_path: release_body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
