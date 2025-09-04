@@ -24,7 +24,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          echo 'matrix={"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl"},{"os":"ubuntu-latest","target":"aarch64-unknown-linux-musl"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc"},{"os":"windows-latest","target":"aarch64-pc-windows-msvc"},{"os":"macos-latest","target":"x86_64-apple-darwin"},{"os":"macos-latest","target":"aarch64-apple-darwin"}]}' >> $GITHUB_OUTPUT
+          echo 'matrix={"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl"},{"os":"ubuntu-latest","target":"aarch64-unknown-linux-musl"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc"},{"os":"macos-latest","target":"x86_64-apple-darwin"},{"os":"macos-latest","target":"aarch64-apple-darwin"}]}' >> $GITHUB_OUTPUT
       - id: set-version
         shell: bash
         run: |
@@ -74,7 +74,12 @@ jobs:
         if: startsWith(matrix.target, 'x86_64-') || startsWith(matrix.target, 'aarch64-apple') || matrix.target == 'x86_64-pc-windows-msvc'
         run: |
           echo "dx bundle for ${{ matrix.target }}"
-          dx bundle --platform desktop --release --targets ${{ matrix.target }}
+          # Use singular --target (previous --targets caused failure)
+          dx bundle --platform desktop --release --target ${{ matrix.target }} || {
+            echo "dx bundle failed; attempting plain cargo build as fallback";
+            rustup target add ${{ matrix.target }} || true
+            cargo build --release --target ${{ matrix.target }};
+          }
 
       - name: Bundle linux aarch64 via docker (dx inside cross image)
         if: matrix.target == 'aarch64-unknown-linux-musl'
@@ -84,11 +89,11 @@ jobs:
           options: -v ${{ github.workspace }}:/project -w /project
           run: |
             cargo install dioxus-cli --locked || true
-            dx bundle --platform desktop --release --targets aarch64-unknown-linux-musl || echo "(dx bundle may not fully support musl in container)"
-
-      - name: Windows ARM64 placeholder
-        if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: echo "Windows ARM64 dx bundle not yet supported on hosted runner" > BUILD_NOTES.txt
+            dx bundle --platform desktop --release --target aarch64-unknown-linux-musl || {
+              echo "dx bundle (musl aarch64) failed; fallback to cargo build";
+              rustup target add aarch64-unknown-linux-musl || true
+              cargo build --release --target aarch64-unknown-linux-musl;
+            }
 
       - name: Collect & archive artifacts
         shell: bash

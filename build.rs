@@ -6,6 +6,22 @@ fn main() {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
     let lang_dir = Path::new("lang");
 
+    // ---- Windows linking fix ----
+    // Some transitive dependencies (e.g. crates pulling in Windows security / crypto APIs)
+    // may fail to link on GitHub Actions Windows runners with unresolved externals like
+    // `__imp_OpenProcessToken`, `__imp_CheckTokenMembership`, etc. These symbols live in
+    // advapi32 (and sometimes secur32 / crypt32). Emitting explicit link directives here
+    // ensures the final binary links cleanly even if upstream crates omit them in certain
+    // feature combinations.
+    if cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-lib=advapi32");
+        println!("cargo:rustc-link-lib=secur32");
+        println!("cargo:rustc-link-lib=crypt32");
+        // (Optional) Uncomment if further ws2_32/userenv symbols show up:
+        // println!("cargo:rustc-link-lib=ws2_32");
+        // println!("cargo:rustc-link-lib=userenv");
+    }
+
     // Trigger rebuild when directory or any json file changes.
     println!("cargo:rerun-if-changed=lang");
 
